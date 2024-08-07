@@ -1,5 +1,111 @@
 #include "INA219.hpp"
 
+/*
+* CALIBRATION REGISTER Calculation
+* max load (bus) voltage = 32 V
+* max shunt voltage = 0.32 V  (voltage across shunt resistor)
+* shunt resistor = 0.01 Ohm
+*
+* max shunt current = vshunt_max / rshunt (0.32/0.01) = 32 A
+* max expected current = 32 A
+*
+* current_lsb = max expected current / 32768 (32/32768) = 0.00097 A per bit
+*       = 0.001 A per bit (current resolution)
+*
+* power_lsb = 20 * current_lsb
+*       = 0.02 W per bit
+*
+* calibration register = 0.04096 / (current_lsb * rshunt)
+*       = 0.04096 / (0.001 * 0.1)
+*        
+* CALIBRATION REGISTER VALUE = 409.6
+*/
+
+float CURRENT_LSB, POWER_LSB;
+I2C i2c(PB_9, PB_8);    //ARDUINO_UNO_I2C_SDA, ARDUINO_UNO_I2C_SCL);
+
+void ina219_init(){
+    CURRENT_LSB = 0.001;
+    POWER_LSB = 0.02;
+    
+    //when writing the 16 bit register, send it as 2 bytes
+    //1st byte is bits 15-8
+    //2nd byte is 0-7
+    char calibration_data[3] = {INA219_REG_CALIBRATION, 0x01, 0x99}; //409 in 2 bytes = 0x0199
+
+    uint16_t config_value = INA219_CONFIG_BVOLTAGERANGE_32V | INA219_CONFIG_GAIN_8_320MV |
+        INA219_CONFIG_BADCRES_12BIT | INA219_CONFIG_SADCRES_12BIT_1S_532US |
+        INA219_CONFIG_MODE_SANDBVOLT_CONTINUOUS;
+
+    char config_data[3] = {INA219_REG_CONFIG, (char)config_value, (char)(config_value >> 8)};
+
+//~~~~~ WRITING DOES NOT WORK!!!! pin problem or code problem?
+    //i2c setup
+    int st;
+
+    i2c.start();
+    st = i2c.write(INA219_WRITE);        //first send the slave address with WRITE bit (to indicate writing)
+    printf("\nCALIB status: %d", st);
+    st = i2c.write(calibration_data[0]); //send address to be written to (CALIB)
+    printf("\nstatus: %d", st);
+    st = i2c.write(calibration_data[1]); //send 1st byte of data
+    printf("\nstatus: %d", st);
+    st = i2c.write(calibration_data[2]); //send 2nd byte of data
+    printf("\nstatus: %d", st);
+    i2c.stop();
+    // i2c.write(INA219_WRITE, calibration_data, 3);
+    //send config value to config register
+    // i2c.write(INA219_WRITE, config_data, 3);
+    i2c.start();
+    st =i2c.write(INA219_WRITE);        //first send the slav address with WRITE bit
+    printf("\nCONFIG status: %d", st);
+    st=i2c.write(config_data[0]);      //send address to be written to (CONFIG)
+    printf("\nstatus: %d", st);
+    st=i2c.write(config_data[1]);
+    printf("\nstatus: %d", st);
+    st=i2c.write(config_data[2]);
+    printf("\nstatus: %d", st);
+    i2c.stop();
+}
+
+float ina219_busvoltage(){
+    uint16_t bvoltage;
+
+    //array to read data into
+    char data[2] = {0,0};
+    
+    //to read from the ina219, first must send which address will be read from
+    i2c.start();
+    i2c.write(INA219_WRITE);
+    i2c.write(INA219_REG_BUSVOLTAGE);
+    i2c.stop();
+    //i2c.write(INA219_WRITE, (char*)INA219_REG_BUSVOLTAGE, 1);
+
+    //start the read by sending START condition
+    i2c.start();
+
+    i2c.write(INA219_READ);
+    data[0] = i2c.read(1);
+    data[1] = i2c.read(1);
+    //send the register to read
+    //i2c.read(INA219_READ, data, 2);
+    i2c.stop();
+
+    printf("\ndata 0: %d", data[0]);
+    printf("\ndata 1: %d\n", data[1]);
+
+    bvoltage = data[0];
+    bvoltage = bvoltage << 8;
+    bvoltage = bvoltage | data[1];
+    //dont need the last 3 bits
+    bvoltage = bvoltage >> 3;
+
+    float ret = bvoltage * 0.004; //multiply by LSB value
+    
+    return ret;
+}
+
+/*
 INA219::INA219 (PinName sda, PinName scl, int addr, int freq, resolution_t res) : I2C(sda, scl), resolution(res), i2c_addr(addr << 1)
 {
     I2C::frequency(freq);
@@ -86,3 +192,4 @@ float INA219::read_current_mA()
     float raw_current = read_current_raw();
     return raw_current / current_divider;
 }
+*/
