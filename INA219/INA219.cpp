@@ -1,5 +1,8 @@
 #include "INA219.hpp"
 
+//This video is very useful:
+// https://www.youtube.com/watch?v=KDWS0IX4p8Q
+
 /*
 * CALIBRATION REGISTER Calculation
 * max load (bus) voltage = 32 V
@@ -23,11 +26,14 @@
 
 float CURRENT_LSB, POWER_LSB;
 I2C i2c(PB_9, PB_8);    //ARDUINO_UNO_I2C_SDA, ARDUINO_UNO_I2C_SCL);
+//Pin layouts:
+// https://os.mbed.com/platforms/ST-Nucleo-WB55RG/
 
 void ina219_init(){
+    //these values were calculated in the comments above
     CURRENT_LSB = 0.001;
     POWER_LSB = 0.02;
-    
+
     //when writing the 16 bit register, send it as 2 bytes
     //1st byte is bits 15-8
     //2nd byte is 0-7
@@ -53,9 +59,7 @@ void ina219_init(){
     st = i2c.write(calibration_data[2]); //send 2nd byte of data
     printf("\nstatus: %d", st);
     i2c.stop();
-    // i2c.write(INA219_WRITE, calibration_data, 3);
-    //send config value to config register
-    // i2c.write(INA219_WRITE, config_data, 3);
+
     i2c.start();
     st =i2c.write(INA219_WRITE);        //first send the slav address with WRITE bit
     printf("\nCONFIG status: %d", st);
@@ -66,6 +70,16 @@ void ina219_init(){
     st=i2c.write(config_data[2]);
     printf("\nstatus: %d", st);
     i2c.stop();
+
+//This was the original 'writing' code, the i2c.write() function should be able to send
+// the write address and data at the same time, however doesn't work
+// so I tried sending every byte individually (in the code above)
+    // i2c.start();
+    //send calibration data
+    // i2c.write(INA219_WRITE, calibration_data, 3);
+    //send config value to config register
+    // i2c.write(INA219_WRITE, config_data, 3);
+    // i2c.stop();
 }
 
 float ina219_busvoltage(){
@@ -76,19 +90,18 @@ float ina219_busvoltage(){
     
     //to read from the ina219, first must send which address will be read from
     i2c.start();
+    //i2c.write(INA219_WRITE, (char*)INA219_REG_BUSVOLTAGE, 1);
     i2c.write(INA219_WRITE);
     i2c.write(INA219_REG_BUSVOLTAGE);
     i2c.stop();
-    //i2c.write(INA219_WRITE, (char*)INA219_REG_BUSVOLTAGE, 1);
 
     //start the read by sending START condition
     i2c.start();
-
+    //send the register to read
+    //i2c.read(INA219_READ, data, 2);
     i2c.write(INA219_READ);
     data[0] = i2c.read(1);
     data[1] = i2c.read(1);
-    //send the register to read
-    //i2c.read(INA219_READ, data, 2);
     i2c.stop();
 
     printf("\ndata 0: %d", data[0]);
@@ -106,6 +119,8 @@ float ina219_busvoltage(){
 }
 
 /*
+ORIGINAL DRIVER
+
 INA219::INA219 (PinName sda, PinName scl, int addr, int freq, resolution_t res) : I2C(sda, scl), resolution(res), i2c_addr(addr << 1)
 {
     I2C::frequency(freq);

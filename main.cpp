@@ -11,14 +11,13 @@
 int main()
 {
     ina219_init();
-    float current;
+    float test;
     printf("starting...\n");
 
-    while (true) {
-        current = ina219_busvoltage();
-        //something in the read function doesnt work...
-        printf("I = %f [mA]\n", current);
-        //only prints out the max current (calibrated to 400 mA in init)
-        wait_us(1000000);
-    }
+    // while (true) {
+    //     test = ina219_busvoltage();
+    //     //something in the read function doesnt work...
+    //     printf("V = %f\n", test);
+    //     wait_us(1000000);
+    // }
 }
